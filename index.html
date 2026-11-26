@@ -1330,7 +1330,7 @@ function hdr(on){['outBtn','syncW'].forEach(i=>{const e=document.getElementById(
 function loginScreen(msg){
   hdr(false);$('#crumb').textContent='Sign in';
   const st='width:100%;padding:10px;font-size:16px;border:1px solid #aab4c1;border-radius:6px;margin:4px 0 10px;box-sizing:border-box';
-  app.innerHTML=`<h1>Sign in</h1><div class="card"><p>Use your TIB account: the same email and password as in the other TIB apps.</p><label>Email</label><input id="lgE" type="email" autocomplete="username" style="${st}"><label>Password</label><input id="lgP" type="password" autocomplete="current-password" style="${st}"><div class="row"><button class="btn" id="lgB">Sign in</button></div><p id="lgM" class="small" style="color:#b3261e;margin-top:8px">${esc(msg||'')}</p></div>`;
+  app.innerHTML=`<h1>Sign in</h1><div class="card"><p>Use your TIB account: the same email and password as in the other TIB apps.</p><label>Email</label><input id="lgE" type="email" autocomplete="username" style="${st}"><label>Password</label><input id="lgP" type="password" autocomplete="current-password" style="${st}"><div class="row"><button class="btn" id="lgB">Sign in</button><button class="btn sec" id="lgF">Forgot password</button></div><p id="lgM" class="small" style="color:#b3261e;margin-top:8px">${esc(msg||'')}</p></div>`;
   const go_=async()=>{
     const e=$('#lgE').value.trim().toLowerCase(),p=$('#lgP').value;
     if(!e||!p){$('#lgM').textContent='Enter your email and password.';return}
@@ -1338,7 +1338,7 @@ function loginScreen(msg){
     try{const j=await authReq('token?grant_type=password',{email:e,password:p});setSes(mkSes(j));await afterLogin()}
     catch(x){$('#lgB').disabled=false;$('#lgM').textContent=(/invalid/i.test(x.message)?'Email or password not correct.':x.message)}
   };
-  $('#lgB').onclick=go_;$('#lgP').onkeydown=ev=>{if(ev.key==='Enter')go_()};
+  $('#lgF').onclick=async()=>{const e=$('#lgE').value.trim().toLowerCase();if(!e){$('#lgM').style.color='#b3261e';$('#lgM').textContent='Type your email above first.';return}$('#lgM').style.color='#444';$('#lgM').textContent='Sending...';try{await authReq('recover?redirect_to='+encodeURIComponent(location.origin+location.pathname),{email:e});$('#lgM').textContent='If that email has a TIB account, a reset link is on its way. Open it on this device, then set a new password. Note: this is your TIB password for all TIB apps.'}catch(x){$('#lgM').style.color='#b3261e';$('#lgM').textContent=x.message}};$('#lgB').onclick=go_;$('#lgP').onkeydown=ev=>{if(ev.key==='Enter')go_()};
 }
 function notEnrolled(){
   hdr(false);const o=document.getElementById('outBtn');if(o)o.style.display='';
@@ -1368,12 +1368,33 @@ async function dash(){
     const [en,pr]=await Promise.all([rest('sapsim_enrollments?select=email,full_name,role&order=email'),rest('advsim_progress?select=email,units_done,updated_at,state')]);
     const m={};pr.forEach(p=>m[p.email]=p);
     const cur=st=>{let k='-';UNITS.forEach(u=>{const s=st&&st[u.id];if(s&&(s.sim||Object.keys(s.lab||{}).length||Object.keys(s.tb||{}).length||s.quiz>=0))k=u.id});return k};
-    const rows=en.map(e=>{const p=m[e.email];return `<tr><td>${esc(e.email)}</td><td>${esc(e.full_name||'')}</td><td>${esc(e.role)}</td><td>${p?p.units_done:0} / ${UNITS.length}</td><td>${p?cur(p.state):'-'}</td><td>${p?new Date(p.updated_at).toLocaleDateString():'Never'}</td></tr>`}).join('');
-    app.innerHTML=`<h1>Trainee progress</h1><div class="card" style="overflow-x:auto"><table><tr><th>Email</th><th>Name</th><th>Role</th><th>Units complete</th><th>Furthest unit</th><th>Last active</th></tr>${rows}</table><p class="small mut">Instructors and admins see every unit unlocked. To enrol someone, add their email to the enrolment list; they sign in with their TIB account.</p></div><div class="row"><button class="btn sec" onclick="go()">Back to units</button></div>`;
+    const adm=ME&&ME.role==='admin';const rows=en.map(e=>{const p=m[e.email];return `<tr><td>${esc(e.email)}${adm&&e.role!=='admin'?` <a href="#" onclick="unenrol('${esc(e.email)}');return false" class="small">remove</a>`:''}</td><td>${esc(e.full_name||'')}</td><td>${esc(e.role)}</td><td>${p?p.units_done:0} / ${UNITS.length}</td><td>${p?cur(p.state):'-'}</td><td>${p?new Date(p.updated_at).toLocaleDateString():'Never'}</td></tr>`}).join('');
+    app.innerHTML=`<h1>Trainee progress</h1><div class="card" style="overflow-x:auto"><table><tr><th>Email</th><th>Name</th><th>Role</th><th>Units complete</th><th>Furthest unit</th><th>Last active</th></tr>${rows}</table><p class="small mut">Instructors and admins see every unit unlocked. </p></div>${adm?`<div class="card"><h3 style="margin-top:0">Enrol a trainee</h3><p class="small mut">The person needs a TIB account (the shared sign-in). If they have none yet, create it first, then enrol the same email here. Enrolling here also gives access to the other TIB apps that use this list.</p><input id="enE" type="email" placeholder="Email" style="width:100%;padding:10px;font-size:16px;border:1px solid #aab4c1;border-radius:6px;margin:4px 0;box-sizing:border-box"><input id="enN" placeholder="Full name" style="width:100%;padding:10px;font-size:16px;border:1px solid #aab4c1;border-radius:6px;margin:4px 0;box-sizing:border-box"><select id="enR" style="width:100%;padding:10px;font-size:16px;border:1px solid #aab4c1;border-radius:6px;margin:4px 0 8px"><option value="trainee">Trainee</option><option value="instructor">Instructor</option></select><div class="row"><button class="btn" onclick="enrol()">Enrol</button></div><p id="enM" class="small"></p></div>`:''}<div class="row"><button class="btn sec" onclick="go()">Back to units</button></div>`;
   }catch(e){app.innerHTML='<h1>Trainee progress</h1><p>Could not load: '+esc(e.message)+'</p>'}
 }
+function recoveryScreen(tok){
+  hdr(false);$('#crumb').textContent='New password';
+  const st='width:100%;padding:10px;font-size:16px;border:1px solid #aab4c1;border-radius:6px;margin:4px 0 10px;box-sizing:border-box';
+  app.innerHTML=`<h1>Set a new password</h1><div class="card"><p>This changes your password for all TIB apps. Use at least 8 characters.</p><label>New password</label><input id="npA" type="password" autocomplete="new-password" style="${st}"><label>Repeat it</label><input id="npB" type="password" autocomplete="new-password" style="${st}"><div class="row"><button class="btn" id="npG">Save password</button></div><p id="npM" class="small" style="color:#b3261e;margin-top:8px"></p></div>`;
+  $('#npG').onclick=async()=>{const a=$('#npA').value,b=$('#npB').value,m=$('#npM');
+    if(a.length<8){m.textContent='Use at least 8 characters.';return}if(a!==b){m.textContent='The two passwords do not match.';return}
+    $('#npG').disabled=true;m.textContent='Saving...';
+    try{const r=await fetch(SB_URL+'/auth/v1/user',{method:'PUT',headers:{apikey:SB_KEY,Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({password:a})});
+      if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.msg||j.error_description||'Could not save')}
+      history.replaceState(null,'',location.pathname);loginScreen('Password changed. Sign in with the new password.');
+    }catch(x){$('#npG').disabled=false;m.textContent=x.message}};
+}
+async function enrol(){
+  const e=$('#enE').value.trim().toLowerCase(),n=$('#enN').value.trim(),r=$('#enR').value,m=$('#enM');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){m.style.color='#b3261e';m.textContent='Enter a valid email.';return}
+  try{await rest('sapsim_enrollments',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({email:e,full_name:n||null,role:r})});dash()}
+  catch(x){m.style.color='#b3261e';m.textContent=/409/.test(x.message)?'Already enrolled.':'Could not enrol ('+x.message+')'}
+}
+async function unenrol(e){if(!confirm('Remove '+e+' from the course list? This also removes access to other TIB apps that use this list.'))return;try{await rest('sapsim_enrollments?email=eq.'+encodeURIComponent(e),{method:'DELETE'});dash()}catch(x){alert('Could not remove: '+x.message)}}
 async function boot(){
   hdr(false);
+  const hp=new URLSearchParams((location.hash||'').replace(/^#/,''));
+  if(hp.get('type')==='recovery'&&hp.get('access_token')){recoveryScreen(hp.get('access_token'));return}
   let s=null;try{s=JSON.parse(localStorage.getItem('tibadv:auth')||'null')}catch(e){}
   if(!s){loginScreen();return}
   SES=s;
